@@ -389,16 +389,77 @@ func (c *Controller) handleObject(obj interface{}) {
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
 func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
-	/*	labels := map[string]string{
+	labels := map[string]string{
 		"app":        bookstore.Name + "-app",
 		"controller": bookstore.Name + "-customController1",
-	}*/
+	}
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bookstore.Spec.DeploymentName + "-deployment",
 			Namespace: bookstore.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(bookstore, samplev1alpha1.SchemeGroupVersion.WithKind("Bookstore")),
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: bookstore.Spec.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  bookstore.Spec.DeploymentName,
+							Image: bookstore.Spec.DeploymentImageName + ":" + bookstore.Spec.DeploymentImageTag,
+
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: bookstore.Spec.ContainerPort,
+								},
+							},
+
+							Env: []corev1.EnvVar{
+								{
+									Name: "AdminUsername",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "env-secrets",
+											},
+											Key: bookstore.Spec.EnvAdminUsername,
+										},
+									},
+								},
+								{
+									Name: "AdminPassword",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "env-secrets",
+											},
+											Key: bookstore.Spec.EnvAdminPassword,
+										},
+									},
+								},
+								{
+									Name: "JWTSECRET",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "env-secrets",
+											},
+											Key: bookstore.Spec.EnvAdminUsername,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
