@@ -25,8 +25,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	calicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico/v1alpha1"
-	fakecalicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico/v1alpha1/fake"
+	calicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico.com/v1alpha1"
+	fakecalicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico.com/v1alpha1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.

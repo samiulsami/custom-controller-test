@@ -26,65 +26,65 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	calicov1alpha1 "k8s.io/sample-controller/pkg/apis/calico.com/v1alpha1"
+	calicocomv1alpha1 "k8s.io/sample-controller/pkg/apis/calico.com/v1alpha1"
 	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
 	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "k8s.io/sample-controller/pkg/generated/listers/calico/v1alpha1"
+	v1alpha1 "k8s.io/sample-controller/pkg/generated/listers/calico.com/v1alpha1"
 )
 
-// CalicoInformer provides access to a shared informer and lister for
-// Calicos.
-type CalicoInformer interface {
+// BookstoreInformer provides access to a shared informer and lister for
+// Bookstores.
+type BookstoreInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.CalicoLister
+	Lister() v1alpha1.BookstoreLister
 }
 
-type calicoInformer struct {
+type bookstoreInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewCalicoInformer constructs a new informer for Calico type.
+// NewBookstoreInformer constructs a new informer for Bookstore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewCalicoInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCalicoInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewBookstoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredBookstoreInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredCalicoInformer constructs a new informer for Calico type.
+// NewFilteredBookstoreInformer constructs a new informer for Bookstore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredCalicoInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredBookstoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CalicoV1alpha1().Calicos(namespace).List(context.TODO(), options)
+				return client.CalicoV1alpha1().Bookstores(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CalicoV1alpha1().Calicos(namespace).Watch(context.TODO(), options)
+				return client.CalicoV1alpha1().Bookstores(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&calicov1alpha1.Calico{},
+		&calicocomv1alpha1.Bookstore{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *calicoInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCalicoInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *bookstoreInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredBookstoreInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *calicoInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&calicov1alpha1.Calico{}, f.defaultInformer)
+func (f *bookstoreInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&calicocomv1alpha1.Bookstore{}, f.defaultInformer)
 }
 
-func (f *calicoInformer) Lister() v1alpha1.CalicoLister {
-	return v1alpha1.NewCalicoLister(f.Informer().GetIndexer())
+func (f *bookstoreInformer) Lister() v1alpha1.BookstoreLister {
+	return v1alpha1.NewBookstoreLister(f.Informer().GetIndexer())
 }

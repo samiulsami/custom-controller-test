@@ -28,7 +28,7 @@ import (
 
 type CalicoV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	CalicosGetter
+	BookstoresGetter
 }
 
 // CalicoV1alpha1Client is used to interact with features provided by the calico.com.k8s.io group.
@@ -36,8 +36,8 @@ type CalicoV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *CalicoV1alpha1Client) Calicos(namespace string) CalicoInterface {
-	return newCalicos(c, namespace)
+func (c *CalicoV1alpha1Client) Bookstores(namespace string) BookstoreInterface {
+	return newBookstores(c, namespace)
 }
 
 // NewForConfig creates a new CalicoV1alpha1Client for the given config.

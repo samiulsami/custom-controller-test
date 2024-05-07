@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
-// CalicoListerExpansion allows custom methods to be added to
-// CalicoLister.
-type CalicoListerExpansion interface{}
+// BookstoreListerExpansion allows custom methods to be added to
+// BookstoreLister.
+type BookstoreListerExpansion interface{}
 
-// CalicoNamespaceListerExpansion allows custom methods to be added to
-// CalicoNamespaceLister.
-type CalicoNamespaceListerExpansion interface{}
+// BookstoreNamespaceListerExpansion allows custom methods to be added to
+// BookstoreNamespaceLister.
+type BookstoreNamespaceListerExpansion interface{}

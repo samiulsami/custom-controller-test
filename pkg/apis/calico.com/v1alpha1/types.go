@@ -34,14 +34,17 @@ type Bookstore struct {
 
 // BookstoreSpec is the spec for a Bookstore resource
 type BookstoreSpec struct {
+	EnvAdminUsername    string `json:"envAdminUsername"`
+	EnvAdminPassword    string `json:"envAdminPassword"`
+	EnvJWTSECRET        string `json:"envJWTSECRET"`
 	DeploymentImageName string `json:"deploymentImageName"`
 	DeploymentImageTag  string `json:"deploymentImageTag"`
 	DeploymentName      string `json:"deploymentName"`
 	Replicas            *int32 `json:"replicas"`
 	ServiceName         string `json:"serviceName"`
-	ContainerPort       string `json:"containerPort"`
-	NodePort            string `json:"nodePort"`
-	TargetPort          string `json:"targetPort"`
+	ContainerPort       int32  `json:"containerPort"`
+	NodePort            int32  `json:"nodePort"`
+	TargetPort          int32  `json:"targetPort"`
 }
 
 // BookstoreStatus is the status for a Bookstore resource
