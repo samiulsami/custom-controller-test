@@ -28,7 +28,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	calicocom "k8s.io/sample-controller/pkg/generated/informers/externalversions/calico.com"
+	calico "k8s.io/sample-controller/pkg/generated/informers/externalversions/calico"
 	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
@@ -253,9 +253,9 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
-	Calico() calicocom.Interface
+	Calico() calico.Interface
 }
 
-func (f *sharedInformerFactory) Calico() calicocom.Interface {
-	return calicocom.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Calico() calico.Interface {
+	return calico.New(f, f.namespace, f.tweakListOptions)
 }

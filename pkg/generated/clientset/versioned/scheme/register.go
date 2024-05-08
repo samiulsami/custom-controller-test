@@ -24,7 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	calicov1alpha1 "k8s.io/sample-controller/pkg/apis/calico.com/v1alpha1"
+	calicov1alpha1 "k8s.io/sample-controller/pkg/apis/calico/v1alpha1"
 )
 
 var Scheme = runtime.NewScheme()

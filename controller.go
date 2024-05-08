@@ -42,11 +42,11 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/calico.com/v1alpha1"
+	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/calico/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
 	samplescheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
-	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions/calico.com/v1alpha1"
-	listers "k8s.io/sample-controller/pkg/generated/listers/calico.com/v1alpha1"
+	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions/calico/v1alpha1"
+	listers "k8s.io/sample-controller/pkg/generated/listers/calico/v1alpha1"
 )
 
 const controllerAgentName = "sample-controller"
@@ -158,8 +158,8 @@ func NewController(
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.handleObject,
 		UpdateFunc: func(old, new interface{}) {
-			oldSVC := old.(corev1.Service)
-			newSVC := new.(corev1.Service)
+			oldSVC := old.(*corev1.Service)
+			newSVC := new.(*corev1.Service)
 			if oldSVC.ResourceVersion == newSVC.ResourceVersion {
 				return
 			}
@@ -278,8 +278,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return err
 	}
 
-	deploymentName := bookstore.Spec.DeploymentName
-	if deploymentName == "" {
+	if bookstore.Spec.DeploymentName == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
 		// the resource will be queued again.
@@ -288,7 +287,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	}
 
 	// Get the deployment with the name specified in Bookstore.spec
-	deployment, err := c.deploymentsLister.Deployments(bookstore.Namespace).Get(deploymentName)
+	deployment, err := c.deploymentsLister.Deployments(bookstore.Namespace).Get(bookstore.Spec.DeploymentName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
 		deployment, err = c.kubeclientset.AppsV1().Deployments(bookstore.Namespace).Create(context.TODO(), newDeployment(bookstore), metav1.CreateOptions{})
@@ -324,6 +323,27 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return err
 	}
 
+	if bookstore.Spec.ServiceName == "" {
+		utilruntime.HandleError(fmt.Errorf("%s: service name must be specified", key))
+		return nil
+	}
+
+	fmt.Println("TRYING TO LIST SERVICES")
+	service, err := c.serviceLister.Services(bookstore.Namespace).Get(bookstore.Spec.ServiceName)
+	if errors.IsNotFound(err) {
+		service, err = c.kubeclientset.CoreV1().Services(bookstore.Namespace).Create(context.TODO(), newService(bookstore), metav1.CreateOptions{})
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if !metav1.IsControlledBy(service, bookstore) {
+		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+		c.recorder.Event(bookstore, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf("%s", msg)
+	}
+
 	// Finally, we update the status block of the Bookstore resource to reflect the
 	// current state of the world
 	err = c.updateBookstoreStatus(bookstore, deployment)
@@ -331,6 +351,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return err
 	}
 
+	fmt.Println("\n-------------------------------------------------------\nNO ERROR\n-------------------------------------------------------\n")
 	c.recorder.Event(bookstore, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
@@ -487,6 +508,7 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 }
 
 func newService(bookstore *samplev1alpha1.Bookstore) *corev1.Service {
+	fmt.Println("CREATING SERVICE")
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",

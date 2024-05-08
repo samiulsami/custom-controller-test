@@ -25,7 +25,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	calicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico.com/v1alpha1"
+	calicov1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/calico/v1alpha1"
 )
 
 type Interface interface {
