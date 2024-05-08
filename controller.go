@@ -467,42 +467,54 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 
 							Env: []corev1.EnvVar{
 								{
-									Name:  "AdminUsername",
-									Value: "admin22",
-									/*ValueFrom: &corev1.EnvVarSource{
+									Name: "AdminUsername",
+									//Value: "admin22",
+									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
 											Key: bookstore.Spec.EnvAdminUsername,
+											Optional: func() *bool {
+												var flag = false
+												return &flag
+											}(),
 										},
-									},*/
+									},
 								},
 
 								{
-									Name:  "AdminPassword",
-									Value: "admin72",
-									/*ValueFrom: &corev1.EnvVarSource{
+									Name: "AdminPassword",
+									//Value: "admin72",
+									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
 											Key: bookstore.Spec.EnvAdminPassword,
+											Optional: func() *bool {
+												var flag = false
+												return &flag
+											}(),
 										},
-									},*/
+									},
 								},
 
 								{
-									Name:  "JWTSECRET",
-									Value: "orangeCat",
-									/*ValueFrom: &corev1.EnvVarSource{
+									Name: "JWTSECRET",
+									//Value: "orangeCat",
+									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
 											Key: bookstore.Spec.EnvJWTSECRET,
+											Optional: func() *bool {
+												var flag = false
+												return &flag
+											}(),
 										},
-									},*/
+									},
 								},
 							},
 						},
