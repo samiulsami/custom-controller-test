@@ -61,3 +61,10 @@ type BookstoreList struct {
 
 	Items []Bookstore `json:"items"`
 }
+
+func (bookstore *Bookstore) GetSelectorLabels() map[string]string {
+	return map[string]string{
+		"app":        bookstore.Name + "-app",
+		"controller": bookstore.Name + "-customController1",
+	}
+}

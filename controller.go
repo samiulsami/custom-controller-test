@@ -19,6 +19,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	v12 "k8s.io/client-go/informers/core/v1"
+	v1 "k8s.io/client-go/listers/core/v1"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -49,21 +52,21 @@ import (
 const controllerAgentName = "sample-controller"
 
 const (
-	// SuccessSynced is used as part of the Event 'reason' when a Foo is synced
+	// SuccessSynced is used as part of the Event 'reason' when a Bookstore is synced
 	SuccessSynced = "Synced"
-	// ErrResourceExists is used as part of the Event 'reason' when a Foo fails
+	// ErrResourceExists is used as part of the Event 'reason' when a Bookstore fails
 	// to sync due to a Deployment of the same name already existing.
 	ErrResourceExists = "ErrResourceExists"
 
 	// MessageResourceExists is the message used for Events when a resource
 	// fails to sync due to a Deployment already existing
-	MessageResourceExists = "Resource %q already exists and is not managed by Foo"
-	// MessageResourceSynced is the message used for an Event fired when a Foo
+	MessageResourceExists = "Resource %q already exists and is not managed by Bookstore"
+	// MessageResourceSynced is the message used for an Event fired when a Bookstore
 	// is synced successfully
-	MessageResourceSynced = "Foo synced successfully"
+	MessageResourceSynced = "Bookstore synced successfully"
 )
 
-// Controller is the controller implementation for Foo resources
+// Controller is the controller implementation for Bookstore resources
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
@@ -71,9 +74,10 @@ type Controller struct {
 	sampleclientset clientset.Interface
 
 	deploymentsLister appslisters.DeploymentLister
+	serviceLister     v1.ServiceLister
 	deploymentsSynced cache.InformerSynced
-	foosLister        listers.BookstoreLister
-	foosSynced        cache.InformerSynced
+	bookstoresLister  listers.BookstoreLister
+	bookstoresSynced  cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
@@ -92,7 +96,8 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	sampleclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
-	fooInformer informers.BookstoreInformer) *Controller {
+	serviceInformer v12.ServiceInformer,
+	bookstoreInformer informers.BookstoreInformer) *Controller {
 	logger := klog.FromContext(ctx)
 
 	// Create event broadcaster
@@ -115,23 +120,23 @@ func NewController(
 		sampleclientset:   sampleclientset,
 		deploymentsLister: deploymentInformer.Lister(),
 		deploymentsSynced: deploymentInformer.Informer().HasSynced,
-		foosLister:        fooInformer.Lister(),
-		foosSynced:        fooInformer.Informer().HasSynced,
+		bookstoresLister:  bookstoreInformer.Lister(),
+		bookstoresSynced:  bookstoreInformer.Informer().HasSynced,
 		workqueue:         workqueue.NewTypedRateLimitingQueue(ratelimiter),
 		recorder:          recorder,
 	}
 
 	logger.Info("Setting up event handlers")
-	// Set up an event handler for when Foo resources change
-	fooInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueueFoo,
+	// Set up an event handler for when Bookstore resources change
+	bookstoreInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.enqueueBookstore,
 		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueFoo(new)
+			controller.enqueueBookstore(new)
 		},
 	})
 	// Set up an event handler for when Deployment resources change. This
 	// handler will lookup the owner of the given Deployment, and if it is
-	// owned by a Foo resource then the handler will enqueue that Foo resource for
+	// owned by a Bookstore resource then the handler will enqueue that Bookstore resource for
 	// processing. This way, we don't need to implement custom logic for
 	// handling Deployment resources. More info on this pattern:
 	// https://github.com/kubernetes/community/blob/8cafef897a22026d42f5e5bb3f104febe7e29830/contributors/devel/controllers.md
@@ -143,6 +148,19 @@ func NewController(
 			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
 				// Periodic resync will send update events for all known Deployments.
 				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.handleObject,
+	})
+
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			oldSVC := old.(corev1.Service)
+			newSVC := new.(corev1.Service)
+			if oldSVC.ResourceVersion == newSVC.ResourceVersion {
 				return
 			}
 			controller.handleObject(new)
@@ -163,17 +181,17 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 	logger := klog.FromContext(ctx)
 
 	// Start the informer factories to begin populating the informer caches
-	logger.Info("Starting Foo controller")
+	logger.Info("Starting Bookstore controller")
 
 	// Wait for the caches to be synced before starting workers
 	logger.Info("Waiting for informer caches to sync")
 
-	if ok := cache.WaitForCacheSync(ctx.Done(), c.deploymentsSynced, c.foosSynced); !ok {
+	if ok := cache.WaitForCacheSync(ctx.Done(), c.deploymentsSynced, c.bookstoresSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	logger.Info("Starting workers", "count", workers)
-	// Launch two workers to process Foo resources
+	// Launch two workers to process Bookstore resources
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
@@ -213,7 +231,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// period.
 		defer c.workqueue.Done(key)
 		// Run the syncHandler, passing it the namespace/name string of the
-		// Foo resource to be synced.
+		// Bookstore resource to be synced.
 		if err := c.syncHandler(ctx, key); err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
 			c.workqueue.AddRateLimited(key)
@@ -235,7 +253,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 }
 
 // syncHandler compares the actual state with the desired, and attempts to
-// converge the two. It then updates the Status block of the Foo resource
+// converge the two. It then updates the Status block of the Bookstore resource
 // with the current status of the resource.
 func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	// Convert the namespace/name string into a distinct namespace and name
@@ -247,20 +265,20 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return nil
 	}
 
-	// Get the Foo resource with this namespace/name
-	foo, err := c.foosLister.Bookstores(namespace).Get(name)
+	// Get the Booksore resource with this namespace/name
+	bookstore, err := c.bookstoresLister.Bookstores(namespace).Get(name)
 	if err != nil {
-		// The Foo resource may no longer exist, in which case we stop
+		// The Bookstore resource may no longer exist, in which case we stop
 		// processing.
 		if errors.IsNotFound(err) {
-			utilruntime.HandleError(fmt.Errorf("foo '%s' in work queue no longer exists", key))
+			utilruntime.HandleError(fmt.Errorf("bookstore '%s' in work queue no longer exists", key))
 			return nil
 		}
 
 		return err
 	}
 
-	deploymentName := foo.Spec.DeploymentName
+	deploymentName := bookstore.Spec.DeploymentName
 	if deploymentName == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
@@ -269,11 +287,11 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return nil
 	}
 
-	// Get the deployment with the name specified in Foo.spec
-	deployment, err := c.deploymentsLister.Deployments(foo.Namespace).Get(deploymentName)
+	// Get the deployment with the name specified in Bookstore.spec
+	deployment, err := c.deploymentsLister.Deployments(bookstore.Namespace).Get(deploymentName)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(context.TODO(), newDeployment(foo), metav1.CreateOptions{})
+		deployment, err = c.kubeclientset.AppsV1().Deployments(bookstore.Namespace).Create(context.TODO(), newDeployment(bookstore), metav1.CreateOptions{})
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -283,20 +301,20 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return err
 	}
 
-	// If the Deployment is not controlled by this Foo resource, we should log
+	// If the Deployment is not controlled by this Bookstore resource, we should log
 	// a warning to the event recorder and return error msg.
-	if !metav1.IsControlledBy(deployment, foo) {
+	if !metav1.IsControlledBy(deployment, bookstore) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
-		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
+		c.recorder.Event(bookstore, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf("%s", msg)
 	}
 
-	// If this number of the replicas on the Foo resource is specified, and the
+	// If this number of the replicas on the Bookstore resource is specified, and the
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
-	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-		logger.V(4).Info("Update deployment resource", "currentReplicas", *foo.Spec.Replicas, "desiredReplicas", *deployment.Spec.Replicas)
-		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(context.TODO(), newDeployment(foo), metav1.UpdateOptions{})
+	if bookstore.Spec.Replicas != nil && *bookstore.Spec.Replicas != *deployment.Spec.Replicas {
+		logger.V(4).Info("Update deployment resource", "currentReplicas", *bookstore.Spec.Replicas, "desiredReplicas", *deployment.Spec.Replicas)
+		deployment, err = c.kubeclientset.AppsV1().Deployments(bookstore.Namespace).Update(context.TODO(), newDeployment(bookstore), metav1.UpdateOptions{})
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
@@ -306,35 +324,35 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return err
 	}
 
-	// Finally, we update the status block of the Foo resource to reflect the
+	// Finally, we update the status block of the Bookstore resource to reflect the
 	// current state of the world
-	err = c.updateFooStatus(foo, deployment)
+	err = c.updateBookstoreStatus(bookstore, deployment)
 	if err != nil {
 		return err
 	}
 
-	c.recorder.Event(foo, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	c.recorder.Event(bookstore, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
 
-func (c *Controller) updateFooStatus(bookstore *samplev1alpha1.Bookstore, deployment *appsv1.Deployment) error {
+func (c *Controller) updateBookstoreStatus(bookstore *samplev1alpha1.Bookstore, deployment *appsv1.Deployment) error {
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
 	bookstoreCopy := bookstore.DeepCopy()
 	bookstoreCopy.Status.AvailableReplicas = deployment.Status.AvailableReplicas
 	// If the CustomResourceSubresources feature gate is not enabled,
-	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
+	// we must use Update instead of UpdateStatus to update the Status block of the Bookstore resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
 	_, err := c.sampleclientset.CalicoV1alpha1().Bookstores(bookstore.Namespace).UpdateStatus(context.TODO(), bookstoreCopy, metav1.UpdateOptions{})
 	return err
 }
 
-// enqueueFoo takes a Foo resource and converts it into a namespace/name
+// enqueueBookstore takes a Bookstore resource and converts it into a namespace/name
 // string which is then put onto the work queue. This method should *not* be
-// passed resources of any type other than Foo.
-func (c *Controller) enqueueFoo(obj interface{}) {
+// passed resources of any type other than Bookstore.
+func (c *Controller) enqueueBookstore(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -345,9 +363,9 @@ func (c *Controller) enqueueFoo(obj interface{}) {
 }
 
 // handleObject will take any resource implementing metav1.Object and attempt
-// to find the Foo resource that 'owns' it. It does this by looking at the
+// to find the Bookstore resource that 'owns' it. It does this by looking at the
 // objects metadata.ownerReferences field for an appropriate OwnerReference.
-// It then enqueues that Foo resource to be processed. If the object does not
+// It then enqueues that Bookstore resource to be processed. If the object does not
 // have an appropriate OwnerReference, it will simply be skipped.
 func (c *Controller) handleObject(obj interface{}) {
 	var object metav1.Object
@@ -368,31 +386,27 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 	logger.V(4).Info("Processing object", "object", klog.KObj(object))
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
-		// If this object is not owned by a Foo, we should not do anything more
+		// If this object is not owned by a Bookstore, we should not do anything more
 		// with it.
-		if ownerRef.Kind != "Foo" {
+		if ownerRef.Kind != "Bookstore" {
 			return
 		}
 
-		foo, err := c.foosLister.Bookstores(object.GetNamespace()).Get(ownerRef.Name)
+		bookstore, err := c.bookstoresLister.Bookstores(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			logger.V(4).Info("Ignore orphaned object", "object", klog.KObj(object), "foo", ownerRef.Name)
+			logger.V(4).Info("Ignore orphaned object", "object", klog.KObj(object), "bookstore", ownerRef.Name)
 			return
 		}
 
-		c.enqueueFoo(foo)
+		c.enqueueBookstore(bookstore)
 		return
 	}
 }
 
-// newDeployment creates a new Deployment for a Foo resource. It also sets
+// newDeployment creates a new Deployment for a Bookstore resource. It also sets
 // the appropriate OwnerReferences on the resource so handleObject can discover
-// the Foo resource that 'owns' it.
+// the Bookstore resource that 'owns' it.
 func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
-	labels := map[string]string{
-		"app":        bookstore.Name + "-app",
-		"controller": bookstore.Name + "-customController1",
-	}
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bookstore.Spec.DeploymentName + "-deployment",
@@ -401,20 +415,25 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 				*metav1.NewControllerRef(bookstore, samplev1alpha1.SchemeGroupVersion.WithKind("Bookstore")),
 			},
 		},
+
 		Spec: appsv1.DeploymentSpec{
 			Replicas: bookstore.Spec.Replicas,
+
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: bookstore.GetSelectorLabels(),
 			},
+
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels: bookstore.GetSelectorLabels(),
 				},
+
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  bookstore.Spec.DeploymentName,
-							Image: bookstore.Spec.DeploymentImageName + ":" + bookstore.Spec.DeploymentImageTag,
+							Name:            bookstore.Spec.DeploymentName,
+							Image:           bookstore.Spec.DeploymentImageName + ":" + bookstore.Spec.DeploymentImageTag,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 
 							Ports: []corev1.ContainerPort{
 								{
@@ -434,6 +453,7 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 										},
 									},
 								},
+
 								{
 									Name: "AdminPassword",
 									ValueFrom: &corev1.EnvVarSource{
@@ -445,6 +465,7 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 										},
 									},
 								},
+
 								{
 									Name: "JWTSECRET",
 									ValueFrom: &corev1.EnvVarSource{
@@ -459,6 +480,36 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 							},
 						},
 					},
+				},
+			},
+		},
+	}
+}
+
+func newService(bookstore *samplev1alpha1.Bookstore) *corev1.Service {
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "core/v1",
+		},
+
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   bookstore.Spec.ServiceName,
+			Labels: bookstore.GetSelectorLabels(),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(bookstore, samplev1alpha1.SchemeGroupVersion.WithKind("Bookstore")),
+			},
+		},
+
+		Spec: corev1.ServiceSpec{
+			Selector: bookstore.GetSelectorLabels(),
+			Type:     corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{
+					Protocol:   corev1.ProtocolTCP,
+					Port:       bookstore.Spec.ContainerPort,
+					TargetPort: intstr.FromInt32(bookstore.Spec.TargetPort),
+					NodePort:   bookstore.Spec.NodePort,
 				},
 			},
 		},
