@@ -73,8 +73,9 @@ type Controller struct {
 	// sampleclientset is a clientset for our own API group
 	sampleclientset clientset.Interface
 
-	deploymentsLister appslisters.DeploymentLister
 	serviceLister     v1.ServiceLister
+	serviceSynced     cache.InformerSynced
+	deploymentsLister appslisters.DeploymentLister
 	deploymentsSynced cache.InformerSynced
 	bookstoresLister  listers.BookstoreLister
 	bookstoresSynced  cache.InformerSynced
@@ -118,6 +119,8 @@ func NewController(
 	controller := &Controller{
 		kubeclientset:     kubeclientset,
 		sampleclientset:   sampleclientset,
+		serviceLister:     serviceInformer.Lister(),
+		serviceSynced:     serviceInformer.Informer().HasSynced,
 		deploymentsLister: deploymentInformer.Lister(),
 		deploymentsSynced: deploymentInformer.Informer().HasSynced,
 		bookstoresLister:  bookstoreInformer.Lister(),
@@ -464,39 +467,42 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 
 							Env: []corev1.EnvVar{
 								{
-									Name: "AdminUsername",
-									ValueFrom: &corev1.EnvVarSource{
+									Name:  "AdminUsername",
+									Value: "admin22",
+									/*ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
 											Key: bookstore.Spec.EnvAdminUsername,
 										},
-									},
+									},*/
 								},
 
 								{
-									Name: "AdminPassword",
-									ValueFrom: &corev1.EnvVarSource{
+									Name:  "AdminPassword",
+									Value: "admin72",
+									/*ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
 											Key: bookstore.Spec.EnvAdminPassword,
 										},
-									},
+									},*/
 								},
 
 								{
-									Name: "JWTSECRET",
-									ValueFrom: &corev1.EnvVarSource{
+									Name:  "JWTSECRET",
+									Value: "orangeCat",
+									/*ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
 												Name: "env-secrets",
 											},
-											Key: bookstore.Spec.EnvAdminUsername,
+											Key: bookstore.Spec.EnvJWTSECRET,
 										},
-									},
+									},*/
 								},
 							},
 						},
