@@ -331,7 +331,6 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 		return nil
 	}
 
-	fmt.Println("TRYING TO LIST SERVICES")
 	service, err := c.serviceLister.Services(bookstore.Namespace).Get(bookstore.Spec.ServiceName)
 	if errors.IsNotFound(err) {
 		service, err = c.kubeclientset.CoreV1().Services(bookstore.Namespace).Create(context.TODO(), newService(bookstore), metav1.CreateOptions{})
@@ -457,7 +456,7 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 						{
 							Name:            bookstore.Spec.DeploymentName,
 							Image:           bookstore.Spec.DeploymentImageName + ":" + bookstore.Spec.DeploymentImageTag,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 
 							Ports: []corev1.ContainerPort{
 								{
