@@ -432,7 +432,7 @@ func (c *Controller) handleObject(obj interface{}) {
 func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      bookstore.Spec.DeploymentName + "-deployment",
+			Name:      bookstore.Spec.DeploymentName,
 			Namespace: bookstore.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(bookstore, samplev1alpha1.SchemeGroupVersion.WithKind("Bookstore")),

@@ -7,7 +7,7 @@ spec:
   envAdminPassword: adminPassword
   envJWTSECRET: jwtSecret
   deploymentImageName: sami7786/gobookstoreapi
-  deploymentImageTag: debug
+  deploymentImageTag: latest
   deploymentName: bookstorecontrollertestdeployment
   replicas: 3
   serviceName: bookstorecontrollertestservice
