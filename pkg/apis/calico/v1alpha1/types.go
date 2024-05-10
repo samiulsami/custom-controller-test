@@ -39,9 +39,11 @@ type BookstoreSpec struct {
 	EnvJWTSECRET        string `json:"envJWTSECRET"`
 	DeploymentImageName string `json:"deploymentImageName"`
 	DeploymentImageTag  string `json:"deploymentImageTag"`
+	ImagePullPolicy     string `json:"imagePullPolicy"`
 	DeploymentName      string `json:"deploymentName"`
 	Replicas            *int32 `json:"replicas"`
 	ServiceName         string `json:"serviceName"`
+	ServiceType         string `json:"serviceType"`
 	ContainerPort       int32  `json:"containerPort"`
 	NodePort            int32  `json:"nodePort"`
 	TargetPort          int32  `json:"targetPort"`

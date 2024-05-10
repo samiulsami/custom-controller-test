@@ -46,10 +46,14 @@ spec:
                   type: string
                 deploymentName:
                   type: string
+                imagePullPolicy:
+                  type: string
                 replicas:
                   format: int32
                   type: integer
                 serviceName:
+                  type: string
+                serviceType:
                   type: string
                 containerPort:
                   format: int32
@@ -67,8 +71,10 @@ spec:
                 - deploymentImageName
                 - deploymentImageTag
                 - deploymentName
+                - imagePullPolicy
                 - replicas
                 - serviceName
+                - serviceType
                 - containerPort
                 - nodePort
                 - targetPort
@@ -81,5 +87,12 @@ spec:
                   type: integer
           required:
             - spec
-
+      subresources:
+        status: { }
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
 

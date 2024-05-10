@@ -8,9 +8,11 @@ spec:
   envJWTSECRET: jwtSecret
   deploymentImageName: sami7786/gobookstoreapi
   deploymentImageTag: latest
+  imagePullPolicy: Always
   deploymentName: bookstorecontrollertestdeployment
   replicas: 3
   serviceName: bookstorecontrollertestservice
+  serviceType: LoadBalancer
   containerPort: 3000
   targetPort: 3000
   nodePort: 30000

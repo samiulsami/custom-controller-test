@@ -264,6 +264,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
+		logger.Error(err, "invalid resource key")
 		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
@@ -277,7 +278,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 			utilruntime.HandleError(fmt.Errorf("bookstore '%s' in work queue no longer exists", key))
 			return nil
 		}
-
+		logger.Error(err, "bookstore lister unknown error")
 		return err
 	}
 
@@ -300,6 +301,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
+		logger.Error(err, "error creating deployments")
 		return err
 	}
 
@@ -323,6 +325,7 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
+		logger.Error(err, "error updating deployment")
 		return err
 	}
 
@@ -337,11 +340,12 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	}
 
 	if err != nil {
+		logger.Error(err, "error creating service")
 		return err
 	}
 
 	if !metav1.IsControlledBy(service, bookstore) {
-		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+		msg := fmt.Sprintf(MessageResourceExists, service.Name)
 		c.recorder.Event(bookstore, corev1.EventTypeWarning, ErrResourceExists, msg)
 		return fmt.Errorf("%s", msg)
 	}
@@ -350,10 +354,11 @@ func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	// current state of the world
 	err = c.updateBookstoreStatus(bookstore, deployment)
 	if err != nil {
+		logger.Error(err, "error updating bookstore status")
 		return err
 	}
 
-	fmt.Println("\n-------------------------------------------------------\nNO ERROR\n-------------------------------------------------------\n")
+	//fmt.Println("\n-------------------------------------------------------\nNO ERROR\n-------------------------------------------------------\n")
 	c.recorder.Event(bookstore, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
@@ -456,7 +461,7 @@ func newDeployment(bookstore *samplev1alpha1.Bookstore) *appsv1.Deployment {
 						{
 							Name:            bookstore.Spec.DeploymentName,
 							Image:           bookstore.Spec.DeploymentImageName + ":" + bookstore.Spec.DeploymentImageTag,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullPolicy(bookstore.Spec.ImagePullPolicy),
 
 							Ports: []corev1.ContainerPort{
 								{
@@ -542,7 +547,7 @@ func newService(bookstore *samplev1alpha1.Bookstore) *corev1.Service {
 
 		Spec: corev1.ServiceSpec{
 			Selector: bookstore.GetSelectorLabels(),
-			Type:     corev1.ServiceTypeLoadBalancer,
+			Type:     corev1.ServiceType(bookstore.Spec.ServiceType),
 			Ports: []corev1.ServicePort{
 				{
 					Protocol:   corev1.ProtocolTCP,
